@@ -1,30 +1,42 @@
+# app.py
 import streamlit as st
 import numpy as np
-from tensorflow.keras.models import load_model
+import joblib
 from PIL import Image, ImageOps
+from sklearn.preprocessing import StandardScaler
 
-# Load the saved model
-model = load_model("mnist_digit_classifier.h5")
+# Load model and scaler
+model = joblib.load("logistic_model.joblib")
+scaler = joblib.load("scaler.joblib")
 
-st.title("Handwritten Digit Classifier")
-st.write("Upload a 28x28 grayscale image of a handwritten digit.")
+st.title("🖊️ Handwritten Digit Recognition (Logistic Regression)")
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("Upload a digit image (white on black, 28x28 preferred)", type=["png", "jpg", "jpeg"])
+
+def preprocess_image(image: Image.Image):
+    # Convert to grayscale
+    gray_image = image.convert("L")
+    
+    # Invert: make background black and digit white (MNIST style)
+    inverted = ImageOps.invert(gray_image)
+
+    # Resize to 28x28
+    resized = inverted.resize((28, 28))
+
+    # Convert to numpy array and flatten
+    img_array = np.array(resized).reshape(1, -1)
+
+    # Scale using saved scaler
+    img_scaled = scaler.transform(img_array)
+
+    return img_scaled
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("L")  # Convert to grayscale
-    image = ImageOps.invert(image)  # Invert image (black background to white)
-    image = image.resize((28, 28))  # Resize to 28x28
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=False)
 
-    st.image(image, caption='Uploaded Image', width=150)
-    
-    # Preprocess the image
-    img_array = np.array(image)
-    img_array = img_array / 255.0
-    img_array = img_array.reshape(1, 28, 28, 1)
+    processed = preprocess_image(image)
 
-    # Make prediction
-    prediction = model.predict(img_array)
-    predicted_class = np.argmax(prediction)
+    prediction = model.predict(processed)
+    st.success(f"Predicted Digit: {prediction[0]}")
 
-    st.write(f"**Predicted Digit:** {predicted_class}")
