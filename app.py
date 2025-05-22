@@ -1,34 +1,30 @@
 import streamlit as st
 import numpy as np
+from tensorflow.keras.models import load_model
 from PIL import Image, ImageOps
-import joblib
 
-model = joblib.load("logistic_mnist_model.joblib")
-scaler = joblib.load("scaler_mnist.joblib")
+# Load the saved model
+model = load_model("mnist_digit_classifier.h5")
 
-def preprocess_image(img):
-    img = img.convert('L') 
-    if np.mean(np.array(img)) > 127:
-        img = ImageOps.invert(img)
-    img.thumbnail((20, 20), Image.Resampling.LANCZOS)
-    canvas = Image.new('L', (28, 28), 0)
-    upper_left = ((28 - img.width) // 2, (28 - img.height) // 2)
-    canvas.paste(img, upper_left)
-    img_array = np.array(canvas).reshape(1, -1)
-    img_scaled = scaler.transform(img_array)
-    return img_scaled, canvas
+st.title("Handwritten Digit Classifier")
+st.write("Upload a 28x28 grayscale image of a handwritten digit.")
 
-st.title("MNIST Digit Recognizer")
-st.write("Upload an image of a digit (ideally handwritten).")
-uploaded_file = st.file_uploader("Choose an image...", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
-    processed_input, processed_img = preprocess_image(image)
-    prediction = model.predict(processed_input)[0]
-    confidence = model.predict_proba(processed_input).max()
-    st.image(processed_img, caption="Processed 28x28 Image", width=150)
-    st.success(f"Predicted Digit: {prediction}")
-    st.info(f"Confidence: {confidence:.2f}")
+    image = Image.open(uploaded_file).convert("L")  # Convert to grayscale
+    image = ImageOps.invert(image)  # Invert image (black background to white)
+    image = image.resize((28, 28))  # Resize to 28x28
 
+    st.image(image, caption='Uploaded Image', width=150)
+    
+    # Preprocess the image
+    img_array = np.array(image)
+    img_array = img_array / 255.0
+    img_array = img_array.reshape(1, 28, 28, 1)
+
+    # Make prediction
+    prediction = model.predict(img_array)
+    predicted_class = np.argmax(prediction)
+
+    st.write(f"**Predicted Digit:** {predicted_class}")
